@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ResumoPDF — Resumos prontos para imprimir</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+
+/* ── PALETTE ── */
+:root{
+  --bg:      #0B1220;
+  --s1:      #111C2E;
+  --s2:      #17263E;
+  --s3:      #1E3050;
+  --border:  #243554;
+  --border2: #2E4268;
+  --tx:      #E6EDF7;
+  --tx2:     #A9B7D0;
+  --tx3:     #5C6E88;
+  --purple:  #7C5CFF;
+  --purple2: #9B82FF;
+  --green:   #22C55E;
+  --red:     #EF4444;
+  --warn:    #F59E0B;
+  --shadow:  rgba(0,0,0,0.5);
+}
+
+body{
+  font-family:'DM Sans',sans-serif;
+  background:var(--bg);
+  color:var(--tx);
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* subtle grid bg */
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:linear-gradient(rgba(124,92,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(124,92,255,0.03) 1px,transparent 1px);
+  background-size:36px 36px;pointer-events:none;z-index:0;
+}
+
+.wrap{position:relative;z-index:1;max-width:1020px;margin:0 auto;padding:0 1.5rem 3rem}
+
+/* ── HEADER ── */
+header{
+  padding:1.6rem 0 1.2rem;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border);
+  animation:fadeDown .5s cubic-bezier(.16,1,.3,1) both;
+}
+@keyframes fadeDown{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
+
+.logo{display:flex;align-items:center;gap:.6rem}
+.logo-icon{
+  width:32px;height:32px;background:var(--purple);border-radius:8px;
+  display:flex;align-items:center;justify-content:center;font-size:.95rem;
+  box-shadow:0 0 18px rgba(124,92,255,.35);
+}
+.logo-name{
+  font-family:'Playfair Display',serif;font-size:1.2rem;font-weight:900;
+  letter-spacing:-.03em;color:var(--tx);
+}
+.logo-name span{color:var(--purple)}
+.logo-tag{font-size:.62rem;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--tx3);margin-top:.1rem}
+
+.header-right{display:flex;align-items:center;gap:.6rem}
+.draft-badge{
+  display:flex;align-items:center;gap:.35rem;
+  font-size:.68rem;color:var(--tx3);font-family:'JetBrains Mono',monospace;
+  opacity:0;transition:opacity .4s;
+}
+.draft-badge.show{opacity:1}
+.draft-dot{width:5px;height:5px;background:var(--green);border-radius:50%}
+
+/* ── LAYOUT ── */
+.workspace{
+  display:grid;grid-template-columns:1fr 290px;gap:1.5rem;
+  margin-top:1.8rem;
+  animation:fadeUp .55s .1s cubic-bezier(.16,1,.3,1) both;
+}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:740px){.workspace{grid-template-columns:1fr}}
+
+/* ── EDITOR SIDE ── */
+.editor-side{display:flex;flex-direction:column;gap:1rem}
+
+/* Section label */
+.slabel{
+  font-size:.62rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--tx3);margin-bottom:.45rem;display:flex;align-items:center;gap:.5rem;
+}
+.slabel::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* Inputs */
+.input-title{
+  width:100%;font-family:'Playfair Display',serif;font-size:1.25rem;font-weight:700;
+  background:transparent;border:none;border-bottom:1.5px solid var(--border);
+  color:var(--tx);padding:.5rem 0;outline:none;letter-spacing:-.02em;transition:border-color .2s;
+}
+.input-title::placeholder{color:var(--tx3)}
+.input-title:focus{border-color:var(--purple)}
+
+.input-sub{
+  width:100%;font-family:'DM Sans',sans-serif;font-size:.9rem;
+  background:transparent;border:none;border-bottom:1px solid var(--border);
+  color:var(--tx2);padding:.45rem 0;outline:none;transition:border-color .2s;margin-top:.6rem;
+}
+.input-sub::placeholder{color:var(--tx3)}
+.input-sub:focus{border-color:var(--border2)}
+
+/* Model rápido row */
+.quick-row{
+  display:flex;align-items:center;gap:.6rem;
+  padding:.6rem .8rem;
+  background:var(--s2);border:1px solid var(--border);border-radius:9px;
+}
+.quick-label{font-size:.75rem;color:var(--tx3);flex:1}
+.quick-btn{
+  font-family:'DM Sans',sans-serif;font-size:.75rem;font-weight:600;
+  background:var(--s3);border:1px solid var(--border2);border-radius:7px;
+  color:var(--tx2);padding:.35rem .8rem;cursor:pointer;transition:all .15s;white-space:nowrap;
+}
+.quick-btn:hover{background:var(--purple);border-color:var(--purple);color:#fff;transform:translateY(-1px)}
+
+/* Toolbar */
+.toolbar{
+  display:flex;gap:.35rem;flex-wrap:wrap;
+  padding:.55rem .7rem;background:var(--s1);border:1px solid var(--border);border-radius:9px;
+}
+.tb{
+  font-family:'DM Sans',sans-serif;font-size:.72rem;font-weight:600;
+  background:var(--s2);border:1px solid var(--border);border-radius:6px;
+  color:var(--tx2);padding:.35rem .7rem;cursor:pointer;transition:all .15s;
+  position:relative;white-space:nowrap;
+}
+.tb:hover{background:var(--s3);border-color:var(--border2);color:var(--tx);transform:translateY(-1px)}
+.tb:active{transform:translateY(0)}
+/* tooltip */
+.tb[data-tip]::after{
+  content:attr(data-tip);
+  position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);
+  background:#0d1824;color:var(--tx2);font-size:.65rem;font-weight:400;
+  padding:.3rem .6rem;border-radius:5px;white-space:nowrap;pointer-events:none;
+  opacity:0;transition:opacity .15s;border:1px solid var(--border);
+  z-index:50;
+}
+.tb:hover::after{opacity:1}
+.tb-sep{width:1px;background:var(--border);align-self:stretch;margin:0 .1rem}
+
+/* Auto-format toggle */
+.autoformat-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.5rem .8rem;
+  background:var(--s1);border:1px solid var(--border);border-radius:9px;
+  cursor:pointer;transition:border-color .2s;user-select:none;
+}
+.autoformat-row:hover{border-color:var(--border2)}
+.af-left{display:flex;align-items:center;gap:.6rem}
+.af-label{font-size:.78rem;font-weight:500;color:var(--tx2)}
+.af-desc{font-size:.67rem;color:var(--tx3);margin-top:.05rem}
+/* toggle switch */
+.toggle{
+  width:36px;height:20px;background:var(--border);border-radius:100px;
+  position:relative;transition:background .2s;flex-shrink:0;
+}
+.toggle.on{background:var(--purple)}
+.toggle::after{
+  content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;
+  background:#fff;border-radius:50%;transition:transform .2s cubic-bezier(.34,1.56,.64,1);
+}
+.toggle.on::after{transform:translateX(16px)}
+
+/* Textarea */
+.ta-wrap{position:relative}
+.editor-ta{
+  width:100%;min-height:340px;
+  font-family:'JetBrains Mono',monospace;font-size:.855rem;line-height:1.82;
+  background:var(--s1);border:1.5px solid var(--border);border-radius:10px;
+  color:var(--tx);padding:1.1rem 1.3rem;outline:none;resize:vertical;
+  caret-color:var(--purple);transition:border-color .2s,box-shadow .2s;
+}
+.editor-ta:focus{border-color:var(--border2);box-shadow:0 0 0 3px rgba(124,92,255,.06)}
+.editor-ta::placeholder{color:var(--tx3);line-height:1.9}
+.ta-footer{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:.45rem .1rem;
+}
+.ta-hint{font-size:.63rem;color:var(--tx3);font-family:'JetBrains Mono',monospace}
+.ta-chars{font-size:.63rem;color:var(--tx3);font-family:'JetBrains Mono',monospace}
+.ta-chars span{color:var(--purple)}
+
+/* paste btn */
+.paste-bar{
+  display:flex;align-items:center;gap:.5rem;
+  font-family:'DM Sans',sans-serif;font-size:.78rem;font-weight:600;
+  background:transparent;border:1.5px dashed var(--border);border-radius:9px;
+  color:var(--tx3);padding:.5rem 1rem;cursor:pointer;transition:all .18s;width:100%;
+}
+.paste-bar:hover{border-color:var(--purple);color:var(--tx2);background:rgba(124,92,255,.05)}
+
+/* file import */
+.file-label{
+  display:flex;align-items:center;gap:.5rem;font-size:.73rem;font-weight:500;
+  color:var(--tx3);cursor:pointer;transition:color .2s;
+}
+.file-label:hover{color:var(--tx2)}
+.file-label input{display:none}
+
+/* ── RIGHT SIDEBAR ── */
+.sidebar{display:flex;flex-direction:column;gap:1rem}
+
+.card{
+  background:var(--s1);border:1px solid var(--border);border-radius:11px;padding:1.1rem;
+}
+.card-title{
+  font-size:.65rem;font-weight:700;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--tx3);margin-bottom:.9rem;display:flex;align-items:center;gap:.5rem;
+}
+.card-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* Style presets chips */
+.presets{display:flex;flex-direction:column;gap:.4rem}
+.preset-chip{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.5rem .75rem;
+  background:var(--s2);border:1.5px solid var(--border);border-radius:8px;
+  cursor:pointer;transition:all .15s;
+}
+.preset-chip:hover{border-color:var(--border2);transform:translateX(2px)}
+.preset-chip.active{border-color:var(--purple);background:rgba(124,92,255,.08)}
+.preset-name{font-size:.78rem;font-weight:600;color:var(--tx2)}
+.preset-chip.active .preset-name{color:var(--purple)}
+.preset-desc{font-size:.65rem;color:var(--tx3);margin-top:.05rem}
+.preset-check{
+  width:16px;height:16px;border-radius:50%;border:1.5px solid var(--border);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  font-size:.65rem;transition:all .15s;
+}
+.preset-chip.active .preset-check{
+  background:var(--purple);border-color:var(--purple);color:#fff;
+}
+
+/* Controls */
+.ctrl{display:flex;flex-direction:column;gap:.4rem;margin-bottom:.8rem}
+.ctrl:last-child{margin-bottom:0}
+
+.ctrl-row{display:flex;align-items:center;justify-content:space-between}
+.ctrl-label{font-size:.73rem;font-weight:600;color:var(--tx2)}
+.ctrl-val{
+  font-family:'JetBrains Mono',monospace;font-size:.7rem;font-weight:500;
+  color:var(--purple);background:rgba(124,92,255,.1);border:1px solid rgba(124,92,255,.2);
+  border-radius:4px;padding:.1rem .4rem;
+}
+.ctrl-tip{
+  font-size:.66rem;color:var(--tx3);line-height:1.5;
+  padding:.4rem .6rem;background:var(--s2);border-left:2px solid var(--border);
+  border-radius:0 6px 6px 0;margin-top:.1rem;
+}
+.ctrl-tip strong{color:var(--tx2)}
+.ctrl-tip em{color:var(--warn);font-style:normal}
+
+input[type=range]{
+  width:100%;height:4px;background:var(--border);border-radius:2px;
+  outline:none;border:none;padding:0;cursor:pointer;
+  appearance:none;-webkit-appearance:none;accent-color:var(--purple);
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:15px;height:15px;background:var(--purple);
+  border-radius:50%;cursor:pointer;box-shadow:0 0 6px rgba(124,92,255,.5);
+  transition:transform .15s;
+}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.25)}
+.range-mm{display:flex;justify-content:space-between;font-size:.6rem;color:var(--tx3);font-family:'JetBrains Mono',monospace}
+
+.fancy-sel{
+  width:100%;font-family:'DM Sans',sans-serif;font-size:.8rem;
+  background:var(--s2);border:1.5px solid var(--border);border-radius:7px;
+  color:var(--tx);padding:.5rem .75rem;outline:none;cursor:pointer;
+  appearance:none;-webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235C6E88' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right .6rem center;padding-right:1.8rem;
+  transition:border-color .2s;
+}
+.fancy-sel:focus{border-color:var(--purple)}
+
+/* Checkboxes */
+.chk-row{display:flex;align-items:flex-start;gap:.6rem;padding:.4rem 0;cursor:pointer}
+.chk-row input[type=checkbox]{width:14px;height:14px;flex-shrink:0;accent-color:var(--purple);margin-top:2px;cursor:pointer}
+.chk-lbl{font-size:.75rem;font-weight:600;color:var(--tx2)}
+.chk-sub{font-size:.65rem;color:var(--tx3);margin-top:.1rem;line-height:1.4}
+
+/* Color swatches */
+.swatches{display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.1rem}
+.sw{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .18s}
+.sw:hover{transform:scale(1.15)}
+.sw.on{border-color:var(--tx);box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--tx)}
+
+/* ── PDF FEEDBACK BAR ── */
+.pdf-feedback{
+  display:flex;align-items:center;gap:.5rem;
+  padding:.6rem .8rem;border-radius:8px;
+  font-size:.73rem;font-weight:500;
+  margin-bottom:.6rem;
+  transition:all .25s;
+  background:var(--s2);border:1px solid var(--border);color:var(--tx3);
+}
+.pdf-feedback.empty{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.06);color:var(--red)}
+.pdf-feedback.ready{border-color:rgba(34,197,94,.25);background:rgba(34,197,94,.05);color:var(--tx2)}
+.pf-dot{width:7px;height:7px;border-radius:50%;background:var(--tx3);flex-shrink:0}
+.pdf-feedback.empty .pf-dot{background:var(--red)}
+.pdf-feedback.ready .pf-dot{background:var(--green)}
+
+/* ── GENERATE BUTTON ── */
+.gen-btn{
+  width:100%;font-family:'DM Sans',sans-serif;font-size:.95rem;font-weight:700;
+  background:var(--purple);color:#fff;
+  border:none;border-radius:10px;padding:.9rem 1.4rem;
+  cursor:pointer;transition:all .22s;
+  display:flex;align-items:center;justify-content:center;gap:.55rem;
+  box-shadow:0 4px 18px rgba(124,92,255,.3);
+  position:relative;overflow:hidden;
+}
+.gen-btn::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,.1),transparent 60%);pointer-events:none;
+}
+.gen-btn:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(124,92,255,.45);background:var(--purple2)}
+.gen-btn:active{transform:translateY(0)}
+.gen-btn.loading .gen-lbl{opacity:0}
+.gen-btn.loading::after{
+  content:'';position:absolute;width:18px;height:18px;
+  border:2px solid rgba(255,255,255,.3);border-top-color:#fff;
+  border-radius:50%;animation:spin .65s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Toast */
+.toast{
+  margin-top:.5rem;padding:.55rem .8rem;border-radius:7px;
+  font-size:.75rem;font-weight:600;
+  display:flex;align-items:center;gap:.5rem;
+  opacity:0;transform:translateY(4px);transition:all .3s cubic-bezier(.34,1.56,.64,1);
+  pointer-events:none;
+  background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);color:var(--green);
+}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.err{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.2);color:var(--red)}
+
+/* Style saved notice */
+.style-saved{
+  font-size:.65rem;color:var(--tx3);text-align:center;
+  padding:.35rem;display:none;
+}
+.style-saved.show{display:block}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">📄</div>
+    <div>
+      <div class="logo-name">Resumo<span>PDF</span></div>
+      <div class="logo-tag">Estudo rápido</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="draft-badge" id="draftBadge">
+      <div class="draft-dot"></div>rascunho salvo
+    </div>
+  </div>
+</header>
+
+<!-- WORKSPACE -->
+<div class="workspace">
+
+  <!-- LEFT: EDITOR -->
+  <div class="editor-side">
+
+    <!-- Title / Subject -->
+    <div>
+      <div class="slabel">Título do resumo</div>
+      <input class="input-title" id="pdfTitle" type="text" placeholder="Ex: Revolução Industrial — Pontos-chave" maxlength="120"/>
+      <input class="input-sub" id="pdfSubject" type="text" placeholder="Matéria · Professor · Data da prova (opcional)" maxlength="140"/>
+    </div>
+
+    <!-- Modelo rápido -->
+    <div class="quick-row">
+      <div>
+        <div style="font-size:.78rem;font-weight:600;color:var(--tx2)">Não sabe por onde começar?</div>
+        <div style="font-size:.67rem;color:var(--tx3);margin-top:.1rem">Preenche um exemplo com o formato correto — só substituir</div>
+      </div>
+      <button class="quick-btn" onclick="fillExample()">✦ Modelo rápido</button>
+    </div>
+
+    <!-- Toolbar -->
+    <div>
+      <div class="slabel">Formatação</div>
+      <div class="toolbar">
+        <button class="tb" onclick="ins('## ')"          data-tip="Cria um título de seção colorido">📌 Seção</button>
+        <button class="tb" onclick="ins('• ')"           data-tip="Adiciona um item de lista com marcador">• Inserir lista</button>
+        <button class="tb" onclick="ins('\n---\n')"       data-tip="Linha horizontal para separar partes do resumo">— Inserir separador</button>
+        <div class="tb-sep"></div>
+        <button class="tb" onclick="wrap('**','**')"     data-tip="Coloca o texto selecionado em negrito"><b>B</b> Negrito (seleção)</button>
+        <button class="tb" onclick="wrap('_','_')"       data-tip="Coloca o texto selecionado em itálico"><i>I</i> Itálico (seleção)</button>
+        <div class="tb-sep"></div>
+        <button class="tb" onclick="undoLast()"          data-tip="Desfaz a última ação">↩ Desfazer</button>
+        <button class="tb" onclick="clearAll()"          data-tip="Apaga todo o conteúdo" style="color:var(--red)">🗑 Limpar</button>
+      </div>
+    </div>
+
+    <!-- Auto-format toggle -->
+    <div class="autoformat-row" onclick="toggleAF()">
+      <div class="af-left">
+        <span style="font-size:1rem">✨</span>
+        <div>
+          <div class="af-label">Formatar automaticamente ao gerar</div>
+          <div class="af-desc">Converte <code style="font-size:.65rem;color:var(--purple)">##</code> em seção e <code style="font-size:.65rem;color:var(--purple)">•</code> em lista no PDF</div>
+        </div>
+      </div>
+      <div class="toggle on" id="afToggle"></div>
+    </div>
+
+    <!-- Paste + file import -->
+    <button class="paste-bar" onclick="pasteClip()">📋 Colar da área de transferência</button>
+
+    <!-- Textarea -->
+    <div class="ta-wrap">
+      <textarea class="editor-ta" id="pdfContent"
+        placeholder="Cole aqui o texto da IA ou escreva seu resumo...
+
+Formatação rápida:
+  ## Título de Seção   → cabeçalho colorido
+  • Item               → marcador de lista
+  **negrito**          → texto em negrito
+  ---                  → linha separadora
+
+Dica: use o botão ✦ Modelo rápido para ver um exemplo!"></textarea>
+      <div class="ta-footer">
+        <div class="ta-hint">Ctrl+Enter = Gerar PDF</div>
+        <div class="ta-chars"><span id="charCount">0</span> caracteres</div>
+      </div>
+    </div>
+
+    <label class="file-label">
+      <input type="file" id="fileIn" accept=".txt,.md" onchange="importFile(event)"/>
+      📂 Importar arquivo .txt ou .md
+    </label>
+
+  </div>
+
+  <!-- RIGHT: SIDEBAR -->
+  <div class="sidebar">
+
+    <!-- Style presets -->
+    <div class="card">
+      <div class="card-title">Presets de estilo</div>
+      <div class="presets" id="presetsEl">
+        <div class="preset-chip active" data-preset="escola" onclick="applyPreset(this)">
+          <div>
+            <div class="preset-name">Escola / ABNT light</div>
+            <div class="preset-desc">Times 12pt · margem 25mm · espaço duplo</div>
+          </div>
+          <div class="preset-check">✓</div>
+        </div>
+        <div class="preset-chip" data-preset="minimal" onclick="applyPreset(this)">
+          <div>
+            <div class="preset-name">Minimal</div>
+            <div class="preset-desc">Helvetica 11pt · margem 18mm · compacto</div>
+          </div>
+          <div class="preset-check"></div>
+        </div>
+        <div class="preset-chip" data-preset="colorido" onclick="applyPreset(this)">
+          <div>
+            <div class="preset-name">Colorido</div>
+            <div class="preset-desc">Barra gradiente · fonte 11pt · margem 20mm</div>
+          </div>
+          <div class="preset-check"></div>
+        </div>
+        <div class="preset-chip" data-preset="compacto" onclick="applyPreset(this)">
+          <div>
+            <div class="preset-name">A4 Compacto</div>
+            <div class="preset-desc">9pt · margem 10mm · máximo conteúdo</div>
+          </div>
+          <div class="preset-check"></div>
+        </div>
+      </div>
+      <div class="style-saved" id="styleSavedMsg">✓ Seu último estilo foi salvo neste navegador</div>
+    </div>
+
+    <!-- Fine-tune controls -->
+    <div class="card">
+      <div class="card-title">Ajuste fino</div>
+
+      <div class="ctrl">
+        <div class="ctrl-row">
+          <span class="ctrl-label">Tamanho da fonte</span>
+          <span class="ctrl-val" id="fsVal">11pt</span>
+        </div>
+        <input type="range" id="fontSize" min="9" max="16" value="11" oninput="syncVal('fsVal',this.value,'pt')"/>
+        <div class="range-mm"><span>9pt pequena</span><span>16pt grande</span></div>
+        <div class="ctrl-tip"><strong>Resumo longo?</strong> Use <em>9–10pt</em> para caber mais. <strong>Vai imprimir e ler longe?</strong> Use <em>13–14pt</em>.</div>
+      </div>
+
+      <div class="ctrl">
+        <div class="ctrl-row">
+          <span class="ctrl-label">Margem do papel</span>
+          <span class="ctrl-val" id="mgVal">18mm</span>
+        </div>
+        <input type="range" id="marginSize" min="8" max="30" value="18" oninput="syncVal('mgVal',this.value,'mm')"/>
+        <div class="range-mm"><span>8mm estreita</span><span>30mm larga</span></div>
+        <div class="ctrl-tip"><strong>O que é margem?</strong> É a borda em branco ao redor do texto. Margem <em>larga (25mm+)</em> deixa espaço para anotar à mão na prova.</div>
+      </div>
+
+      <div class="ctrl">
+        <div class="ctrl-row">
+          <span class="ctrl-label">Espaçamento</span>
+          <span class="ctrl-val" id="spLabel">Normal</span>
+        </div>
+        <select class="fancy-sel" id="lineSpacing" onchange="syncSpacing()">
+          <option value="1.2">Compacto — cabe muito texto</option>
+          <option value="1.5" selected>Normal — equilíbrio ✓</option>
+          <option value="1.8">Confortável — fácil de ler</option>
+          <option value="2.2">Duplo — espaço para anotar à mão</option>
+        </select>
+      </div>
+
+      <div class="ctrl">
+        <span class="ctrl-label" style="margin-bottom:.45rem;display:block">Cor de destaque</span>
+        <div class="swatches" id="swatches">
+          <div class="sw on"  style="background:#c0392b" data-c="#c0392b" onclick="pickColor(this)" title="Vermelho"></div>
+          <div class="sw"     style="background:#7C5CFF" data-c="#7C5CFF" onclick="pickColor(this)" title="Roxo"></div>
+          <div class="sw"     style="background:#2060a0" data-c="#2060a0" onclick="pickColor(this)" title="Azul"></div>
+          <div class="sw"     style="background:#1a7a4a" data-c="#1a7a4a" onclick="pickColor(this)" title="Verde"></div>
+          <div class="sw"     style="background:#e67e22" data-c="#e67e22" onclick="pickColor(this)" title="Laranja"></div>
+          <div class="sw"     style="background:#8e44ad" data-c="#8e44ad" onclick="pickColor(this)" title="Roxo escuro"></div>
+          <div class="sw"     style="background:#1a1709" data-c="#1a1709" onclick="pickColor(this)" title="Preto"></div>
+        </div>
+      </div>
+
+      <div class="ctrl">
+        <select class="fancy-sel" id="titleFont">
+          <option value="helvetica">Helvetica — moderna e limpa</option>
+          <option value="times">Times — clássica e acadêmica</option>
+          <option value="courier">Courier — estilo máquina de escrever</option>
+        </select>
+      </div>
+
+    </div>
+
+    <!-- PDF options -->
+    <div class="card">
+      <div class="card-title">Opções do PDF</div>
+      <label class="chk-row"><input type="checkbox" id="optBar" checked/><div><div class="chk-lbl">Barra colorida no topo</div><div class="chk-sub">Faixa fina com a cor de destaque — visual profissional</div></div></label>
+      <label class="chk-row"><input type="checkbox" id="optPg" checked/><div><div class="chk-lbl">Número de página</div><div class="chk-sub">Útil quando o resumo tem várias páginas</div></div></label>
+      <label class="chk-row"><input type="checkbox" id="optDate" checked/><div><div class="chk-lbl">Data no rodapé</div><div class="chk-sub">Saber quando o resumo foi gerado</div></div></label>
+      <div class="ctrl" style="margin-top:.7rem;margin-bottom:0">
+        <select class="fancy-sel" id="pageFormat">
+          <option value="a4">A4 — padrão Brasil ✓</option>
+          <option value="letter">Letter — padrão EUA</option>
+          <option value="a5">A5 — metade do A4 (bolso)</option>
+        </select>
+        <div class="ctrl-tip" style="margin-top:.4rem"><strong>A4</strong> é o tamanho padrão nas impressoras do Brasil. Deixe A4 se não sabe qual usar.</div>
+      </div>
+    </div>
+
+    <!-- PDF Feedback -->
+    <div class="pdf-feedback empty" id="pdfFeedback">
+      <div class="pf-dot"></div>
+      <span id="pdfFeedbackTxt">Conteúdo vazio — escreva algo para gerar o PDF</span>
+    </div>
+
+    <!-- Generate -->
+    <button class="gen-btn" id="genBtn" onclick="generatePDF()">
+      <span style="font-size:1.05rem">⬇</span>
+      <span class="gen-lbl">Gerar e Baixar PDF</span>
+    </button>
+    <div class="toast" id="toast"></div>
+
+  </div>
+</div>
+</div>
+
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const ta=()=>$('pdfContent');
+let accentColor='#c0392b';
+let afOn=true;
+let hist=[],hIdx=-1,htimer;
+
+/* ── HISTORY ── */
+function pushHist(){
+  const v=ta().value;
+  if(hist[hIdx]===v)return;
+  hist=hist.slice(0,hIdx+1);hist.push(v);hIdx=hist.length-1;
+  if(hist.length>60){hist.shift();hIdx--;}
+}
+function undoLast(){
+  if(hIdx<=0)return;
+  hIdx--;ta().value=hist[hIdx];ta().dispatchEvent(new Event('input'));
+}
+
+/* ── EDITOR HELPERS ── */
+function ins(text){
+  const t=ta(),s=t.selectionStart;
+  t.value=t.value.substring(0,s)+text+t.value.substring(t.selectionEnd);
+  t.focus();t.selectionStart=t.selectionEnd=s+text.length;
+  t.dispatchEvent(new Event('input'));
+}
+function wrap(b,a){
+  const t=ta(),s=t.selectionStart,e=t.selectionEnd;
+  const sel=t.value.substring(s,e)||'texto';
+  t.value=t.value.substring(0,s)+b+sel+a+t.value.substring(e);
+  t.focus();t.selectionStart=s+b.length;t.selectionEnd=s+b.length+sel.length;
+  t.dispatchEvent(new Event('input'));
+}
+function clearAll(){
+  if(!confirm('Limpar tudo?'))return;
+  ta().value='';$('pdfTitle').value='';$('pdfSubject').value='';
+  ta().dispatchEvent(new Event('input'));pushHist();
+}
+
+/* ── MODEL RÁPIDO ── */
+function fillExample(){
+  $('pdfTitle').value='Revolução Industrial — Resumo';
+  $('pdfSubject').value='História · Prof. Carlos · Prova Sexta';
+  ta().value=`## Contexto Histórico
+• Séc. XVIII–XIX na Inglaterra
+• Transição do trabalho manual para máquinas
+• Surgimento do capitalismo industrial
+
+---
+
+## Principais Causas
+• Revolução Agrícola → excedente de mão de obra
+• Abundância de carvão e ferro na Inglaterra
+• **Máquina a vapor** (James Watt, 1769) como motor da mudança
+
+---
+
+## Consequências
+• Urbanização acelerada das cidades
+• Surgimento do _proletariado_
+• Poluição e condições de trabalho precárias
+• Base para a Segunda Revolução Industrial`;
+  ta().dispatchEvent(new Event('input'));pushHist();
+  showToast('✦ Modelo carregado — substitua com seu conteúdo!',false);
+}
+
+/* ── AUTO-FORMAT TOGGLE ── */
+function toggleAF(){
+  afOn=!afOn;
+  $('afToggle').classList.toggle('on',afOn);
+}
+
+/* ── PASTE ── */
+async function pasteClip(){
+  try{
+    const text=await navigator.clipboard.readText();
+    const t=ta(),s=t.selectionStart;
+    t.value=t.value.substring(0,s)+text+t.value.substring(t.selectionEnd);
+    t.selectionStart=t.selectionEnd=s+text.length;
+    t.focus();t.dispatchEvent(new Event('input'));
+    showToast('✅ Colado!',false);
+  }catch(e){showToast('⚠️ Use Ctrl+V no campo de texto',true);}
+}
+
+/* ── FILE IMPORT ── */
+function importFile(ev){
+  const f=ev.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=e=>{ta().value=e.target.result;ta().dispatchEvent(new Event('input'));pushHist();showToast('📂 '+f.name+' importado',false)};
+  r.readAsText(f,'utf-8');ev.target.value='';
+}
+
+/* ── PRESETS ── */
+const presetData={
+  escola:  {fontSize:12,marginSize:25,lineSpacing:'2.2',titleFont:'times',color:'#2060a0'},
+  minimal: {fontSize:11,marginSize:18,lineSpacing:'1.5',titleFont:'helvetica',color:'#1a1710'},
+  colorido:{fontSize:11,marginSize:20,lineSpacing:'1.5',titleFont:'helvetica',color:'#8e44ad'},
+  compacto:{fontSize:9, marginSize:10,lineSpacing:'1.2',titleFont:'helvetica',color:'#c0392b'},
+};
+function applyPreset(el){
+  document.querySelectorAll('.preset-chip').forEach(c=>{
+    c.classList.remove('active');c.querySelector('.preset-check').textContent='';
+  });
+  el.classList.add('active');el.querySelector('.preset-check').textContent='✓';
+  const d=presetData[el.dataset.preset];
+  $('fontSize').value=d.fontSize;syncVal('fsVal',d.fontSize,'pt');
+  $('marginSize').value=d.marginSize;syncVal('mgVal',d.marginSize,'mm');
+  $('lineSpacing').value=d.lineSpacing;syncSpacing();
+  $('titleFont').value=d.titleFont;
+  // pick color
+  const sw=document.querySelector(`.sw[data-c="${d.color}"]`);
+  if(sw)pickColor(sw);
+  saveStyle();
+  showToast('✦ Preset "'+el.querySelector('.preset-name').textContent+'" aplicado',false);
+}
+
+/* ── CONTROLS ── */
+function syncVal(id,val,unit){$(id).textContent=val+unit;updateFeedback();saveStyle();}
+function syncSpacing(){
+  const map={'1.2':'Compacto','1.5':'Normal','1.8':'Confortável','2.2':'Duplo'};
+  $('spLabel').textContent=map[$('lineSpacing').value]||'Normal';
+  updateFeedback();saveStyle();
+}
+function pickColor(el){
+  document.querySelectorAll('.sw').forEach(s=>s.classList.remove('on'));
+  el.classList.add('on');accentColor=el.dataset.c;
+  saveStyle();
+}
+
+/* ── PDF FEEDBACK ── */
+function updateFeedback(){
+  const content=ta().value.trim();
+  const words=content===''?0:content.split(/\s+/).length;
+  const fs=parseInt($('fontSize').value)||11;
+  const wpp=Math.round(450*(11/fs));
+  const pages=Math.max(1,Math.ceil(words/wpp));
+  const mg=$('marginSize').value;
+  const fmt=($('pageFormat').value||'a4').toUpperCase();
+  const fb=$('pdfFeedback');
+  const tx=$('pdfFeedbackTxt');
+  $('charCount').textContent=ta().value.length;
+  if(!content){
+    fb.className='pdf-feedback empty';
+    tx.textContent='Conteúdo vazio — escreva algo para gerar o PDF';
+  }else{
+    fb.className='pdf-feedback ready';
+    tx.textContent=`Pronto · ~${pages} pág · ${fmt} · margem ${mg}mm · ${words} palavras`;
+  }
+}
+
+/* ── DRAFT SAVE ── */
+let saveTimer;
+function saveDraft(){
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>{
+    try{
+      localStorage.setItem('rpdf_c',ta().value);
+      localStorage.setItem('rpdf_t',$('pdfTitle').value);
+      localStorage.setItem('rpdf_s',$('pdfSubject').value);
+      $('draftBadge').classList.add('show');
+      setTimeout(()=>$('draftBadge').classList.remove('show'),1800);
+    }catch(e){}
+  },800);
+}
+function loadDraft(){
+  try{
+    const c=localStorage.getItem('rpdf_c'),t=localStorage.getItem('rpdf_t'),s=localStorage.getItem('rpdf_s');
+    if(c)ta().value=c;if(t)$('pdfTitle').value=t;if(s)$('pdfSubject').value=s;
+    ta().dispatchEvent(new Event('input'));pushHist();
+  }catch(e){}
+}
+
+/* ── STYLE SAVE ── */
+function saveStyle(){
+  try{
+    localStorage.setItem('rpdf_style',JSON.stringify({
+      fontSize:$('fontSize').value,
+      marginSize:$('marginSize').value,
+      lineSpacing:$('lineSpacing').value,
+      titleFont:$('titleFont').value,
+      color:accentColor,
+    }));
+    const msg=$('styleSavedMsg');
+    msg.classList.add('show');
+    setTimeout(()=>msg.classList.remove('show'),2500);
+  }catch(e){}
+}
+function loadStyle(){
+  try{
+    const raw=localStorage.getItem('rpdf_style');
+    if(!raw)return;
+    const d=JSON.parse(raw);
+    if(d.fontSize){$('fontSize').value=d.fontSize;syncVal('fsVal',d.fontSize,'pt');}
+    if(d.marginSize){$('marginSize').value=d.marginSize;syncVal('mgVal',d.marginSize,'mm');}
+    if(d.lineSpacing){$('lineSpacing').value=d.lineSpacing;syncSpacing();}
+    if(d.titleFont)$('titleFont').value=d.titleFont;
+    if(d.color){const sw=document.querySelector(`.sw[data-c="${d.color}"]`);if(sw)pickColor(sw);}
+  }catch(e){}
+}
+
+/* ── EVENTS ── */
+ta().addEventListener('input',()=>{
+  updateFeedback();saveDraft();
+  clearTimeout(htimer);htimer=setTimeout(pushHist,500);
+});
+$('pdfTitle').addEventListener('input',saveDraft);
+$('pdfSubject').addEventListener('input',saveDraft);
+$('fontSize').addEventListener('input',()=>updateFeedback());
+$('marginSize').addEventListener('input',()=>updateFeedback());
+$('pageFormat').addEventListener('change',()=>updateFeedback());
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();generatePDF();}
+  if((e.ctrlKey||e.metaKey)&&e.key==='z'&&document.activeElement!==ta()){e.preventDefault();undoLast();}
+});
+ta().addEventListener('keydown',e=>{if(e.key==='Tab'){e.preventDefault();ins('    ');}});
+
+/* ── TOAST ── */
+let tTimer;
+function showToast(msg,isErr){
+  const t=$('toast');t.textContent=msg;
+  t.classList.toggle('err',!!isErr);t.classList.add('show');
+  clearTimeout(tTimer);tTimer=setTimeout(()=>t.classList.remove('show'),3200);
+}
+
+/* ── HELPERS ── */
+function hexRgb(h){return[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];}
+
+/* ── PDF GENERATION ── */
+async function generatePDF(){
+  const title=$('pdfTitle').value.trim()||'Resumo de Estudos';
+  const subject=$('pdfSubject').value.trim();
+  const rawContent=ta().value.trim();
+  if(!rawContent){showToast('⚠️ Escreva o conteúdo primeiro!',true);return;}
+
+  const btn=$('genBtn');btn.classList.add('loading');btn.disabled=true;
+  try{
+    await new Promise(r=>setTimeout(r,60));
+    const{jsPDF}=window.jspdf;
+    const fontSize=parseInt($('fontSize').value)||11;
+    const marginMM=parseInt($('marginSize').value)||18;
+    const spacing=parseFloat($('lineSpacing').value)||1.5;
+    const titleFont=$('titleFont').value||'helvetica';
+    const pageFormat=$('pageFormat').value||'a4';
+    const optBar=$('optBar').checked;
+    const optPg=$('optPg').checked;
+    const optDate=$('optDate').checked;
+    const preset=document.querySelector('.preset-chip.active')?.dataset.preset||'minimal';
+    const accent=hexRgb(accentColor);
+
+    // Auto-format if toggle on
+    const content=afOn?autoFmt(rawContent):rawContent;
+
+    const doc=new jsPDF({unit:'mm',format:pageFormat==='a5'?'a5':(pageFormat==='letter'?'letter':'a4')});
+    const pw=doc.internal.pageSize.getWidth();
+    const ph=doc.internal.pageSize.getHeight();
+    const tw=pw-marginMM*2;
+    let y=marginMM,pageNum=1;
+
+    function fillPage(){
+      if(preset==='moderno'){doc.setFillColor(13,13,15);doc.rect(0,0,pw,ph,'F');}
+    }
+    function drawBar(){
+      if(!optBar)return;
+      if(preset==='colorido'){
+        doc.setFillColor(...hexRgb('#8e44ad'));doc.rect(0,0,pw/2,3,'F');
+        doc.setFillColor(...hexRgb('#e67e22'));doc.rect(pw/2,0,pw/2,3,'F');
+      }else{doc.setFillColor(...accent);doc.rect(0,0,pw,3,'F');}
+    }
+    function drawFooter(){
+      doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(170,165,155);
+      if(optPg)doc.text(String(pageNum),pw/2,ph-6,{align:'center'});
+      if(optDate){const d=new Date();doc.text(d.toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'}),marginMM,ph-6);}
+      if(optPg||optDate){doc.setDrawColor(210,205,195);doc.setLineWidth(0.2);doc.line(marginMM,ph-9,pw-marginMM,ph-9);}
+    }
+    function newPage(){drawFooter();doc.addPage();pageNum++;fillPage();drawBar();y=marginMM+(optBar?7:0);}
+    function chkBreak(n){if(y+n>ph-marginMM-14)newPage();}
+
+    fillPage();drawBar();
+    y=marginMM+(optBar?7:0);
+
+    // Title
+    doc.setFont(titleFont,'bold');doc.setFontSize(fontSize+8);doc.setTextColor(30,25,15);
+    const tl=doc.splitTextToSize(title,tw);doc.text(tl,marginMM,y);
+    y+=tl.length*(fontSize+8)*0.42+2;
+
+    // Subject
+    if(subject){
+      doc.setFont('helvetica','normal');doc.setFontSize(fontSize-0.5);doc.setTextColor(...accent);
+      doc.text(subject,marginMM,y);y+=5;
+    }
+
+    // Header divider
+    doc.setDrawColor(...accent);doc.setLineWidth(0.5);doc.line(marginMM,y+1,pw-marginMM,y+1);y+=5;
+
+    // Body
+    const lh=(fontSize*spacing)*0.37;
+    for(const raw of content.split('\n')){
+      const tr=raw.trim();
+      if(tr==='---'){chkBreak(6);doc.setDrawColor(200,195,185);doc.setLineWidth(0.25);doc.line(marginMM,y+2,pw-marginMM,y+2);y+=6;continue;}
+      if(tr.startsWith('## ')){
+        const st=tr.slice(3).trim();chkBreak(12);y+=2;
+        doc.setFont(titleFont,'bold');doc.setFontSize(fontSize+2);doc.setTextColor(...accent);
+        const sl=doc.splitTextToSize(st,tw);doc.text(sl,marginMM,y);
+        y+=sl.length*(fontSize+2)*0.42+1;
+        doc.setDrawColor(...accent);doc.setLineWidth(0.25);doc.line(marginMM,y+0.5,marginMM+Math.min(50,tw*0.4),y+0.5);
+        y+=3.5;continue;
+      }
+      if(tr===''){y+=lh*0.5;continue;}
+      const isBullet=/^[•\-\*]\s/.test(tr);
+      const lt=isBullet?tr.replace(/^[•\-\*]\s+/,''):raw;
+      const xi=isBullet?5:0;
+      doc.setFont('helvetica','normal');doc.setFontSize(fontSize);doc.setTextColor(30,25,15);
+      const wr=doc.splitTextToSize(lt,tw-xi);
+      chkBreak(wr.length*lh+1);
+      if(isBullet){doc.setFillColor(...accent);doc.circle(marginMM+1.5,y-1.1,0.85,'F');}
+      for(const wl of wr){
+        const parts=wl.split(/(\*\*[^*]+\*\*|_[^_]+_)/g);
+        let cx=marginMM+xi;
+        for(const p of parts){
+          if(!p)continue;
+          if(p.startsWith('**')&&p.endsWith('**')){
+            const t2=p.slice(2,-2);doc.setFont('helvetica','bold');doc.setTextColor(30,25,15);
+            doc.text(t2,cx,y);cx+=doc.getTextWidth(t2);doc.setFont('helvetica','normal');
+          }else if(p.startsWith('_')&&p.endsWith('_')){
+            const t2=p.slice(1,-1);doc.setFont('helvetica','italic');doc.setTextColor(100,90,80);
+            doc.text(t2,cx,y);cx+=doc.getTextWidth(t2);doc.setFont('helvetica','normal');doc.setTextColor(30,25,15);
+          }else{doc.text(p,cx,y);cx+=doc.getTextWidth(p);}
+        }
+        y+=lh;
+      }
+    }
+
+    drawFooter();
+    const name=(title.replace(/[^\w\sÀ-ÿ]/g,'').replace(/\s+/g,'_').substring(0,40)||'resumo')+'.pdf';
+    doc.save(name);
+    showToast('✅ PDF salvo com sucesso!',false);
+  }catch(err){
+    console.error(err);showToast('❌ Erro: '+err.message,true);
+  }finally{btn.classList.remove('loading');btn.disabled=false;}
+}
+
+/* ── AUTO-FORMAT ── */
+function autoFmt(text){
+  const lines=text.split('\n'),res=[];
+  for(let i=0;i<lines.length;i++){
+    const r=lines[i],tr=r.trim();
+    if(tr.startsWith('## ')||tr==='---'){res.push(r);continue;}
+    if(/^\d+[\.\)]\s+[A-ZÁÉÍÓÚÀÂÊÔÃÕ]/.test(tr)&&tr.length<80){res.push('## '+tr.replace(/^\d+[\.\)]\s+/,''));continue;}
+    if(tr.length>3&&tr.length<60&&tr===tr.toUpperCase()&&/[A-Z]{3,}/.test(tr)){res.push('## '+tr.charAt(0)+tr.slice(1).toLowerCase());continue;}
+    if(tr.endsWith(':')&&tr.length<60&&!tr.includes('.')){res.push('## '+tr.slice(0,-1));continue;}
+    if(/^[-\*]\s/.test(tr)){res.push('• '+tr.replace(/^[-\*]\s+/,''));continue;}
+    res.push(r);
+  }
+  const fin=[];
+  for(let i=0;i<res.length;i++){
+    if(i>0&&res[i].startsWith('## ')&&res[i-1].trim()!==''&&res[i-1]!=='---')fin.push('');
+    fin.push(res[i]);
+  }
+  return fin.join('\n');
+}
+
+/* ── INIT ── */
+loadStyle();loadDraft();pushHist();updateFeedback();
+</script>
+</body>
+</html>
